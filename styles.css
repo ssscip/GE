@@ -1,0 +1,119 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f8f9fa;
+}
+
+header, #main-header {
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: all 0.3s ease;
+}
+header.shrunk, #main-header.shrunk {
+    height: 50px;
+}
+#header-logo {
+    width: 100px;
+    height: auto;
+    transition: all 0.3s ease;
+    display: block;
+    margin: 0 auto;
+}
+header.shrunk #header-logo, #main-header.shrunk #header-logo {
+    width: 50px;
+}
+
+#logo {
+    width: 300px;
+    height: auto;
+    max-width: 100%;
+    display: block;
+    margin: 40px auto 0 auto;
+}
+
+.back-to-home {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 10px 20px;
+    background: #fff;
+    color: #000;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: opacity 0.3s, background 0.3s;
+    z-index: 100;
+}
+.back-to-home:hover {
+    opacity: 0.8;
+    background: #f0f0f0;
+}
+/* Modern responsive styles for GE project */
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f8f9fa;
+}
+
+header {
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: all 0.3s ease;
+}
+header.shrunk {
+    height: 50px;
+}
+#header-logo {
+    width: 100px;
+    height: auto;
+    transition: all 0.3s ease;
+    display: block;
+    margin: 0 auto;
+}
+header.shrunk #header-logo {
+    width: 50px;
+}
+
+.back-to-home {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 10px 20px;
+    background: #fff;
+    color: #000;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: opacity 0.3s, background 0.3s;
+    z-index: 100;
+}
+.back-to-home:hover {
+    opacity: 0.8;
+    background: #f0f0f0;
+}
+
+/* Responsive logo for homepage */
+#logo {
+    width: 300px;
+    height: auto;
+    max-width: 100%;
+    display: block;
+    margin: 40px auto 0 auto;
+}

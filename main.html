@@ -5,6 +5,7 @@
   <title>Terra — MODIS (GIBS) + MOPITT (COG) — demo</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css">
   <style>
     html,body,#map { height:100%; margin:0; padding:0; }
     .controls { position: absolute; z-index: 1000; right: 12px; top: 12px; background: rgba(0,0,0,0.6); color:#fff; padding:10px; border-radius:8px; font-family:system-ui; }
@@ -63,9 +64,61 @@
       background: transparent;
       border: 0;
     }
+
+    /* Back to Home button */
+    .back-to-home {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1001;
+      background: rgba(255,255,255,0.9);
+      color: #333;
+      padding: 8px 16px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-family: system-ui;
+      font-size: 14px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .back-to-home:hover {
+      background: rgba(255,255,255,1);
+      transform: translateY(-2px);
+    }
+
+    /* Header styles */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      z-index: 1000;
+      transition: background 0.3s;
+    }
+
+    #header-logo {
+      height: 40px;
+      margin-right: 20px;
+    }
+
+    /* Scroll effect for header */
+    body.scrolled header {
+      background: rgba(0,0,0,1);
+    }
   </style>
 </head>
 <body>
+  <a href="index.html" class="back-to-home">Back to Home</a>
+  <header>
+    <img id="header-logo" src="assets/images/logo.png" alt="Logo">
+  </header>
   <div id="map"></div>
 
   <div class="controls" id="controls">
