@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Monitoring | Interactive Map</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Leaflet.js Library -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+    <!-- Back to Home Button -->
+    <a href="index.html" id="back-to-home-btn" aria-label="Back to Homepage">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+    </a>
+
+    <!-- UI Toggle Button -->
+    <button id="toggle-ui-btn" aria-label="Toggle Controls Panel">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+    </button>
+
+    <main>
+        <!-- Main UI Panel (Initially Hidden) -->
+        <div id="ui-panel">
+            <div id="layer-switcher">
+              <h4>Data Layer</h4>
+              <div class="layer-option">
+                <input type="radio" id="layer-modis" name="layer" value="MODIS_Terra_CorrectedReflectance_TrueColor" checked>
+                <label for="layer-modis">True Color (MODIS)</label>
+              </div>
+               <!-- Сюда можно будет добавить другие слои, если понадобится -->
+            </div>
+            
+            <div id="controls">
+              <h3>Date: <span id="dateLabel">2020-07-01</span></h3>
+              <input type="range" id="dateSlider" title="Drag to change date">
+              <input type="date" id="dateInput" value="2020-07-01" min="2000-01-01" max="2025-12-31">
+              <div class="controls-footer">
+                  <input type="checkbox" id="showAllCheckbox">
+                  <label for="showAllCheckbox">Show All Events</label>
+              </div>
+            </div>
+        </div>
+
+        <div id="map"></div>
+    </main>
+
+    <script src="js/script.js"></script>
+</body>
+</html>

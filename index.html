@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Global Monitoring 2000-2025 - Tracking Earth's Changes">
+    <title>Global Monitoring 2000-2025</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header id="main-header">
+        <button class="mobile-menu-toggle" aria-label="Toggle menu">
+            <span class="hamburger"></span>
+        </button>
+        <nav class="main-nav">
+            <a href="index.html" class="active">Home</a>
+            <a href="main.html">Interactive Map</a>
+            
+            <!-- CORRECTED LOGO IMPLEMENTATION -->
+            <a href="index.html" class="logo-link">
+                <img src="assets/images/logo.png" alt="Global Monitoring 2025 Logo" class="logo-img">
+            </a>
+            
+            <a href="#about">About the Project</a>
+            <a href="#hackathon">The Hackathon</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="hero">
+            <h1>Monitoring Our Planet's Evolution</h1>
+            <p class="sub-headline">A quarter-century of global environmental observation and analysis: 2000-2025</p>
+        </section>
+
+        <section id="events">
+            <h2>Latest Events</h2>
+            <div class="grid-container">
+                <div class="event-card" data-event="bushfire">
+                    <h3>Australian Black Summer (2019-2020)</h3>
+                    <p>Unprecedented bushfires devastated over 46 million acres of land, causing catastrophic damage to ecosystems and wildlife. Satellite imagery revealed the true scale of this disaster, with smoke plumes visible from space.</p>
+                </div>
+                <div class="event-card" data-event="hurricane">
+                    <h3>Hurricane Katrina (2005)</h3>
+                    <p>One of the most destructive Atlantic hurricanes in U.S. history, captured in detail by NASA's satellites. The storm surge and flooding transformed our understanding of coastal vulnerability and disaster response.</p>
+                </div>
+                <div class="event-card" data-event="volcano">
+                    <h3>Eyjafjallajökull Eruption (2010)</h3>
+                    <p>Iceland's volcanic eruption disrupted global air travel for weeks. Satellite monitoring provided crucial data about ash cloud movements, revolutionizing volcanic activity tracking systems.</p>
+                </div>
+                <div class="event-card" data-event="arctic">
+                    <h3>Arctic Sea Ice Minimum (2012)</h3>
+                    <p>Satellites recorded the lowest Arctic sea ice extent in recorded history, marking a critical moment in climate change monitoring. This event became a powerful symbol of global warming's impact.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="about">
+            <h2>About the Project</h2>
+            <div class="content-container">
+                <p>Global Monitoring 2000-2025 is an innovative data visualization project developed for the NASA Space Apps Challenge, showcasing a quarter-century of Earth observation data. By harnessing the power of NASA's extensive satellite network, we've created a comprehensive timeline of our planet's environmental evolution.</p>
+                
+                <p>Our project combines data from multiple NASA missions, including Terra, Aqua, and the Suomi NPP satellites, to create an unprecedented view of Earth's changing face. Through interactive visualizations and detailed analysis, we highlight significant environmental events, climate patterns, and long-term trends that have shaped our world.</p>
+                
+                <p>This platform serves as both a scientific resource and a public education tool, making complex environmental data accessible to everyone. By presenting 25 years of observations in an engaging format, we aim to foster understanding of our planet's dynamic systems and inspire action for environmental preservation.</p>
+            </div>
+        </section>
+
+        <section id="data">
+            <h2>Scientific Data</h2>
+            <button class="cta-button">View Scientific Data</button>
+        </section>
+
+        <section id="gallery">
+            <h2>Visual Journey</h2>
+            <div class="gallery-container">
+                <div class="gallery-item">
+                    <img src="https://images.unsplash.com/photo-1462331940025-496dfbfc7564" alt="Colorful nebula in deep space">
+                </div>
+                <div class="gallery-item">
+                    <img src="https://images.unsplash.com/photo-1543722530-d2c3201371e7" alt="Northern Lights display">
+                </div>
+                <div class="gallery-item">
+                    <img src="https://images.unsplash.com/photo-1614642264762-d0a3b8bf3700" alt="Milky Way galaxy view">
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="social-links">
+            <a href="#" class="social-icon" aria-label="Twitter">🐦</a>
+            <a href="#" class="social-icon" aria-label="LinkedIn">💼</a>
+            <a href="#" class="social-icon" aria-label="GitHub">📚</a>
+        </div>
+        <p class="copyright">&copy; 2025 Global Monitoring Project. All rights reserved.</p>
+    </footer>
+
+    <!-- Modal -->
+    <div id="data-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="modal-close" aria-label="Close modal">&times;</button>
+            <h2>Scientific Data Analysis</h2>
+            <div class="modal-body">
+                <div id="chart-container">
+                    <!-- Chart will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+</body>
+</html>

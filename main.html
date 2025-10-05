@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Terra — MODIS (GIBS) + MOPITT (COG) — demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html,body,#map { height:100%; margin:0; padding:0; }
+    .controls { position: absolute; z-index: 1000; right: 12px; top: 12px; background: rgba(0,0,0,0.6); color:#fff; padding:10px; border-radius:8px; font-family:system-ui; }
+    .controls label { display:block; font-size:13px; margin-bottom:6px; }
+    button { cursor:pointer; }
+
+    /* Improved styling for controls */
+    .controls {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      backdrop-filter: blur(4px);
+    }
+
+    /* Style for popup content */
+    .custom-popup {
+      font-family: system-ui;
+      line-height: 1.5;
+    }
+
+    /* Ensure media inside popups fits */
+    .custom-popup video, .custom-popup img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin-top: 8px;
+      border-radius: 6px;
+    }
+
+    /* Style for buttons */
+    button {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      background: #4a90e2;
+      color: white;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #357abd;
+    }
+    /* marker icon (emoji) */
+    .marker-icon {
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.95);
+      color: #111;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      font-size: 18px;
+      border: 2px solid rgba(0,0,0,0.08);
+    }
+    .custom-div-icon {
+      background: transparent;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="controls" id="controls">
+    <label>
+      <strong>MODIS (Terra) — TrueColor (GIBS)</strong>
+    </label>
+    <label>
+      Дата:
+      <input id="dateInput" type="date" value="2020-07-01" max="2025-12-31" min="2000-01-01" />
+    </label>
+    <label style="margin-top:8px;">
+      Дата: <span id="dateLabel">2020-07-01</span>
+      <input id="dateSlider" type="range" min="0" max="0" step="1" value="0" style="width:220px; display:block; margin-top:6px;" />
+    </label>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+      <button id="applyBtn">Застосувати дату</button>
+      <button id="toggleModis">Приховати MODIS</button>
+      <button id="zoomAllBtn">Згорнути до всіх</button>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+      <input id="showAllCheckbox" type="checkbox" />
+      <span>Показати всі флаги</span>
+    </label>
+    <div style="margin-top:8px; font-size:13px; color:#fff; display:flex;align-items:center;gap:10px;">
+      <span>Видимі флаги: <strong id="visibleCount">0</strong></span>
+    </div>
+    <div id="legend" style="margin-top:8px; font-size:13px; color:#fff;">
+      <strong>Легенда:</strong>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:10px;color:#fff;font-size:13px;"><div class="marker-icon" style="width:20px;height:20px;font-size:12px;">🔥</div><span>Пожежа</span></div>
+        <div style="display:flex;align-items:center;gap:10px;color:#fff;font-size:13px;"><div class="marker-icon" style="width:20px;height:20px;font-size:12px;">🌊</div><span>Повінь / Цунамі</span></div>
+        <div style="display:flex;align-items:center;gap:10px;color:#fff;font-size:13px;"><div class="marker-icon" style="width:20px;height:20px;font-size:12px;">🌀</div><span>Ураган</span></div>
+        <div style="display:flex;align-items:center;gap:10px;color:#fff;font-size:13px;"><div class="marker-icon" style="width:20px;height:20px;font-size:12px;">🌋</div><span>Землетрус</span></div>
+        <div style="display:flex;align-items:center;gap:10px;color:#fff;font-size:13px;"><div class="marker-icon" style="width:20px;height:20px;font-size:12px;">☀️</div><span>Посуха / Спека</span></div>
+      </div>
+    </div>
+
+    <hr style="margin:8px 0; border-color: rgba(255,255,255,0.08)">
+
+
+  <!-- Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  
+  <script>
+    // --- Инициализация карты ---
+    // Initialize map with bounds restriction
+    const map = L.map('map', {
+      // Set initial view to show Ukraine region
+      center: [48.3794, 31.1656],
+      zoom: 6,
+      // Set maximum and minimum zoom levels
+      maxZoom: 18,
+      minZoom: 2,
+      // Set map bounds to cover entire world
+      maxBounds: [
+        [-90, -180], // Southwest coordinates (South Pole)
+        [90, 180]    // Northeast coordinates (North Pole)
+      ],
+      maxBoundsViscosity: 1.0 // Makes the bounds completely solid
+    });
+
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    // --- MODIS via NASA GIBS (WMTS/XYZ style) ---
+    // Layer id для Terra TrueColor:
+    const MODIS_LAYER_ID = 'MODIS_Terra_CorrectedReflectance_TrueColor';
+    const TILE_MATRIX = 'GoogleMapsCompatible_Level9'; // часто подходит; GIBS поддерживает наборы
+    // образец WMTS/XYZ URL (GIBS)
+    // формат: https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/{layer}/default/{time}/{tileMatrixSet}/{z}/{y}/{x}.jpg
+    function makeGIBSUrl(layerId, dateStr) {
+      // dateStr в формате YYYY-MM-DD
+      return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layerId}/default/${dateStr}/${TILE_MATRIX}/{z}/{y}/{x}.jpg`;
+    }
+
+    let modisDate = document.getElementById('dateInput').value || '2020-07-01';
+    let modisLayer = L.tileLayer(makeGIBSUrl(MODIS_LAYER_ID, modisDate), {
+      tileSize: 256,
+      opacity: 0.95,
+      attribution: 'NASA GIBS'
+    }).addTo(map);
+
+  
+
+    // --- Additional event markers/popups ---
+  // Odessa (floods) — detailed per user's latest data
+  const OdessaCoords = [46.291083, 30.44366];
+  const odessaMarker = L.marker(OdessaCoords).addTo(map);
+  const odessaPopupContent = `
+    <div class="custom-popup">
+      <h3>Повінь в Одесі</h3>
+      <p>Місцевість: Одеса, Україна</p>
+      <p>Дата: 30 вересня 2025 року</p>
+      <h4>Коротка інформація</h4>
+      <p>Потужна злива, за добу випало близько 94 мм опадів, що становить ≈224% місячної норми.
+      Злива паралізувала рух, підтоплені приватні і багатоповерхові будинки, дороги, пошкоджені інженерні мережі.</p>
+      <p><strong>Жертви:</strong> 10 осіб загинуло.</p>
+      <h4>Наслідки</h4>
+      <p>Понад 800 будівель пошкоджені (≈500 багатоповерхівок та приватних будинків), значні руйнування доріг та інженерних мереж, пошкоджена комунальна інфраструктура. Близько 70 дерев і великих гілок повалено, близько 23 000 споживачів залишилися без електропостачання.</p>
+    </div>
+  `;
+  odessaMarker.bindPopup(odessaPopupContent, { maxWidth: 360, className: 'custom-popup' });
+
+    // European heatwave 2003 (Western & Central Europe)
+    const heat2003Coords = [46.0, 6.0]; // central coords over western/central Europe
+    const heat2003 = L.marker(heat2003Coords).addTo(map);
+    const heat2003Popup = `
+      <div class="custom-popup">
+        <h3>Європейська спека (2003)</h3>
+        <p>Місцевість: Західна та Центральна Європа (Франція, Італія, Німеччина)</p>
+        <p>Дата: Липень–серпень 2003 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Хвиля спеки з температурами понад +40 °C. Відсутність готовності до таких умов призвела до масових смертей.</p>
+        <p><strong>Жертви:</strong> понад 70 000 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Висихання річок (Рейн, Луара), руйнування врожаїв, проблеми з енергопостачанням, збільшення смертності серед літніх людей, поштовх до політики адаптації до кліматичних змін у ЄС.</p>
+      </div>
+    `;
+    heat2003.bindPopup(heat2003Popup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Germany floods (July 2021) — Rheinland-Pfalz, North Rhine-Westphalia
+    const ger2021Coords = [50.5, 7.0];
+    const ger2021 = L.marker(ger2021Coords).addTo(map);
+    const ger2021Popup = `
+      <div class="custom-popup">
+        <h3>Повінь у Німеччині (2021)</h3>
+        <p>Місцевість: Рейнланд-Пфальц, Північний Рейн-Вестфалія</p>
+        <p>Дата: Липень 2021 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Найсильніші дощі за десятиліття спричинили раптові повені.</p>
+        <p><strong>Жертви:</strong> понад 180 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Руйнування будинків і мостів, ≈30 млрд € збитків, 200 тис. людей залишилися без електропостачання, поштовх до нової політики адаптації до клімату у Німеччині.</p>
+      </div>
+    `;
+    ger2021.bindPopup(ger2021Popup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Lytton heatwave (Canada, June 2021)
+    const lyttonCoords = [50.170, -121.593];
+    const lytton = L.marker(lyttonCoords).addTo(map);
+    const lyttonPopup = `
+      <div class="custom-popup">
+        <h3>Спека в Канаді (Літтон, 2021)</h3>
+        <p>Місцевість: Британська Колумбія, Канада</p>
+        <p>Дата: Червень 2021 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Рекордна температура +49,6 °C — найвища в історії Канади.</p>
+        <p><strong>Жертви:</strong> понад 600 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Місто Літтон частково/повністю згоріло, пошкодження інфраструктури, проблеми з енергосистемою, широкі пожежі.</p>
+      </div>
+    `;
+    lytton.bindPopup(lyttonPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Pakistan floods (2022)
+    const pakistan22Coords = [30.0, 70.0];
+    const pakistan22 = L.marker(pakistan22Coords).addTo(map);
+    const pakistan22Popup = `
+      <div class="custom-popup">
+        <h3>Повені в Пакистані (2022)</h3>
+        <p>Місцевість: Пакистан</p>
+        <p>Дата: Серпень–вересень 2022 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Надзвичайні мусонні дощі, що затопили велику частину країни.</p>
+        <p><strong>Жертви:</strong> понад 1 700 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>33 млн постраждалих, зруйновано ≈2 млн будинків, спалах хвороб (холера, малярія), збитки понад $30 млрд.</p>
+      </div>
+    `;
+    pakistan22.bindPopup(pakistan22Popup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Global heat 2023
+    const globalHeatCoords = [0.0, 0.0];
+    const globalHeat = L.marker(globalHeatCoords).addTo(map);
+    const globalHeatPopup = `
+      <div class="custom-popup">
+        <h3>Глобальна спека (2023)</h3>
+        <p>Місцевість: Весь світ</p>
+        <p>Дата: 2023 рік</p>
+        <h4>Коротка інформація</h4>
+        <p>Найспекотніший рік в історії; середня глобальна температура перевищила попередній рекорд 2016 року.</p>
+        <p><strong>Жертви:</strong> десятки тисяч людей унаслідок хвиль спеки.</p>
+        <h4>Наслідки</h4>
+        <p>Масові пожежі (Канада, Греція, Іспанія), танення льодовиків, підняття рівня моря, збільшення кількості екстремальних явищ.</p>
+      </div>
+    `;
+    globalHeat.bindPopup(globalHeatPopup, { maxWidth: 360, className: 'custom-popup' });
+
+    // Arctic temperature anomalies (2024)
+    const arcticCoords = [75.0, -40.0];
+    const arcticAnom = L.marker(arcticCoords).addTo(map);
+    const arcticPopup = `
+      <div class="custom-popup">
+        <h3>Арктичні температурні аномалії (2024)</h3>
+        <p>Місцевість: Гренландія, Сибір, Північна Канада</p>
+        <p>Дата: 2024 рік</p>
+        <h4>Коротка інформація</h4>
+        <p>Температура в Арктиці на 15–20 °C вище норми.</p>
+        <p><strong>Жертви:</strong> немає прямого впливу на населення.</p>
+        <h4>Наслідки</h4>
+        <p>Прискорене танення льодовиків, підняття рівня океану, порушення циркуляції повітря, вплив на погоду в середніх широтах.</p>
+      </div>
+    `;
+    arcticAnom.bindPopup(arcticPopup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Rio de Janeiro floods (Feb 2022)
+    const rioCoords = [-22.9068, -43.1729];
+    const rioFloods = L.marker(rioCoords).addTo(map);
+    const rioPopup = `
+      <div class="custom-popup">
+        <h3>Повені у Бразилії (Ріо-де-Жанейро, 2022)</h3>
+        <p>Місцевість: Бразилія, штат Ріо-де-Жанейро</p>
+        <p>Дата: Лютий 2022 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Сильні зливи спричинили селеві потоки та обвали в гірських районах.</p>
+        <p><strong>Жертви:</strong> понад 230 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Зруйновані будинки, зниклі безвісти, евакуації, значні економічні втрати для регіону.</p>
+      </div>
+    `;
+    rioFloods.bindPopup(rioPopup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Hurricane Irma (2017)
+    const irmaCoords = [18.0, -66.5];
+    const irma = L.marker(irmaCoords).addTo(map);
+    const irmaPopup = `
+      <div class="custom-popup">
+        <h3>Ураган «Ірма» (2017)</h3>
+        <p>Місцевість: Карибський басейн, США (Флорида)</p>
+        <p>Дата: Вересень 2017 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Ураган 5-ї категорії з вітрами понад 295 км/год.</p>
+        <p><strong>Жертви:</strong> понад 130 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Знищені острови Барбуда, Сен-Мартен, частини Куби та Флориди; економічні збитки ≈ $77 млрд; масові евакуації.</p>
+      </div>
+    `;
+    irma.bindPopup(irmaPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Hurricane Maria (2017) — Puerto Rico
+    const mariaCoords = [18.2, -66.5];
+    const maria = L.marker(mariaCoords).addTo(map);
+    const mariaPopup = `
+      <div class="custom-popup">
+        <h3>Ураган «Марія» (2017)</h3>
+        <p>Місцевість: Пуерто-Рико</p>
+        <p>Дата: Вересень 2017 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Потужний ураган 5-ї категорії, який обрушився на Пуерто-Рико після «Ірми».</p>
+        <p><strong>Жертви:</strong> понад 3 000 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Повне руйнування електромереж, дефіцит питної води, гуманітарна криза, значні економічні збитки.</p>
+      </div>
+    `;
+    maria.bindPopup(mariaPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Camp Fire (California, 2018)
+    const campFireCoords = [39.8, -121.6];
+    const campFire = L.marker(campFireCoords).addTo(map);
+    const campFirePopup = `
+      <div class="custom-popup">
+        <h3>Пожежі в Каліфорнії (Camp Fire, 2018)</h3>
+        <p>Місцевість: Каліфорнія, США</p>
+        <p>Дата: Листопад 2018 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Найсмертоносніша пожежа в історії Каліфорнії, спричинена сильним вітром і посухою.</p>
+        <p><strong>Жертви:</strong> 85 осіб, понад 18 000 будинків знищено.</p>
+        <h4>Наслідки</h4>
+        <p>Повне знищення міста Парадайз, збитки ≈ $16 млрд, посилення правил пожежної безпеки.</p>
+      </div>
+    `;
+    campFire.bindPopup(campFirePopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Siberia / Arctic fires (2019-2021)
+    const siberiaCoords = [64.0, 105.0];
+    const siberia = L.marker(siberiaCoords).addTo(map);
+    const siberiaPopup = `
+      <div class="custom-popup">
+        <h3>Пожежі в Сибіру та Арктиці (2019–2021)</h3>
+        <p>Місцевість: Якутія, Красноярський край, арктичні регіони Росії</p>
+        <p>Дата: 2019–2021 роки</p>
+        <h4>Коротка інформація</h4>
+        <p>Масові пожежі в тундрі та тайзі; площа вигоряння — мільйони гектарів.</p>
+        <p><strong>Жертви:</strong> кілька десятків людей, мільйони тварин.</p>
+        <h4>Наслідки</h4>
+        <p>Викиди CO₂, танення вічної мерзлоти, довготривалі екологічні наслідки.</p>
+      </div>
+    `;
+    siberia.bindPopup(siberiaPopup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Yangtze / China floods (2020)
+    const yangtzeCoords = [31.0, 112.0];
+    const yangtze = L.marker(yangtzeCoords).addTo(map);
+    const yangtzePopup = `
+      <div class="custom-popup">
+        <h3>Повені в Китаї (Янцзи, 2020)</h3>
+        <p>Місцевість: басейн річки Янцзи, Китай</p>
+        <p>Дата: Липень–серпень 2020 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Найсильніші дощі за 60 років, підняття рівня річок, руйнування дамб.</p>
+        <p><strong>Жертви:</strong> понад 200 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Евакуація ≈4 млн людей, затоплення сільгоспугідь, збитки ≈ $35 млрд.</p>
+      </div>
+    `;
+    yangtze.bindPopup(yangtzePopup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Haiti earthquake (2010)
+    const haitiCoords = [18.5333, -72.3333];
+    const haiti = L.marker(haitiCoords).addTo(map);
+    const haitiPopup = `
+      <div class="custom-popup">
+        <h3>Землетрус у Гаїті (2010)</h3>
+        <p>Місцевість: Гаїті (поблизу Порт-о-Пренс)</p>
+        <p>Дата: 12 січня 2010 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Землетрус магнітудою 7,0 спричинив колосальні руйнування.</p>
+        <p><strong>Жертви:</strong> близько 230 000 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Зруйновані лікарні, школи, будинки; гуманітарна криза; спалах холери.</p>
+      </div>
+    `;
+    haiti.bindPopup(haitiPopup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Nepal earthquake (2015)
+    const nepalCoords = [28.3949, 84.1240];
+    const nepal = L.marker(nepalCoords).addTo(map);
+    const nepalPopup = `
+      <div class="custom-popup">
+        <h3>Землетрус у Непалі (2015)</h3>
+        <p>Місцевість: Катманду та Гімалаї</p>
+        <p>Дата: Квітень 2015 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Землетрус магнітудою 7,8, який зруйнував великі території.</p>
+        <p><strong>Жертви:</strong> понад 8 900 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Руйнування храмів, лавини на Евересті, ≈3.5 млн людей без дому.</p>
+      </div>
+    `;
+    nepal.bindPopup(nepalPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Turkey-Syria earthquake (Feb 2023)
+    const turkSyrCoords = [37.0, 38.0];
+    const turkSyr = L.marker(turkSyrCoords).addTo(map);
+    const turkSyrPopup = `
+      <div class="custom-popup">
+        <h3>Землетрус у Туреччині та Сирії (2023)</h3>
+        <p>Місцевість: Південна Туреччина, Північна Сирія</p>
+        <p>Дата: Лютий 2023 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Подвійний землетрус магнітудою ~7.8 і 7.5 — великий регіональний катаклізм.</p>
+        <p><strong>Жертви:</strong> понад 55 000 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Зруйновані цілі міста, сотні тисяч бездомних, економічні збитки ≈ $100 млрд.</p>
+      </div>
+    `;
+    turkSyr.bindPopup(turkSyrPopup, { maxWidth: 360, className: 'custom-popup' });
+
+    // Greece fires (2021, 2023)
+    const greeceCoords = [38.0, 23.7];
+    const greeceFires = L.marker(greeceCoords).addTo(map);
+    const greecePopup = `
+      <div class="custom-popup">
+        <h3>Пожежі в Греції (2021, 2023)</h3>
+        <p>Місцевість: Аттика, Родос, Евбея</p>
+        <p>Дата: Літо 2021, 2023 роки</p>
+        <h4>Коротка інформація</h4>
+        <p>Сильна спека та вітер спричинили масштабні лісові пожежі.</p>
+        <p><strong>Жертви:</strong> десятки загиблих.</p>
+        <h4>Наслідки</h4>
+        <p>Евакуація тисяч туристів, знищені ліси, пошкодження курортів, підвищення ерозії ґрунтів.</p>
+      </div>
+    `;
+    greeceFires.bindPopup(greecePopup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Hurricane Ian (2022)
+    const ianCoords = [27.0, -82.5];
+    const ian = L.marker(ianCoords).addTo(map);
+    const ianPopup = `
+      <div class="custom-popup">
+        <h3>Ураган «Іан» (2022)</h3>
+        <p>Місцевість: Флорида, Південна Кароліна</p>
+        <p>Дата: Вересень 2022 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Один із найпотужніших ураганів; сильні вітри та руйнівні шторми.</p>
+        <p><strong>Жертви:</strong> понад 150 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Потужні повені, збитки ≈ $113 млрд, руйнування 30 000 будинків.</p>
+      </div>
+    `;
+    ian.bindPopup(ianPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Storm Daniel / Europe floods (2023)
+    const danielCoords = [34.5, 22.6];
+    const daniel = L.marker(danielCoords).addTo(map);
+    const danielPopup = `
+      <div class="custom-popup">
+        <h3>Повінь у Європі (Шторм «Деніел», 2023)</h3>
+        <p>Місцевість: Греція, Лівія, Болгарія</p>
+        <p>Дата: Вересень 2023 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Потужний циклон із тривалими дощами спричинив катастрофічні повені.</p>
+        <p><strong>Жертви:</strong> понад 11 000 осіб у Лівії (зокрема місто Дерна).</p>
+        <h4>Наслідки</h4>
+        <p>Руйнування дамб, затоплення міст, гуманітарна криза, десятки тисяч зниклих.</p>
+      </div>
+    `;
+    daniel.bindPopup(danielPopup, { maxWidth: 360, className: 'custom-popup' });
+
+    // India droughts (multiple years)
+    const indiaDroughtCoords = [22.0, 79.0];
+    const indiaDrought = L.marker(indiaDroughtCoords).addTo(map);
+    const indiaDroughtPopup = `
+      <div class="custom-popup">
+        <h3>Посуха в Індії (2016, 2019, 2022)</h3>
+        <p>Місцевість: Центральна та Південна Індія</p>
+        <p>Дата: 2016, 2019, 2022 роки</p>
+        <h4>Коротка інформація</h4>
+        <p>Відсутність мусонних дощів, висихання річок, серйозні проблеми з врожаєм.</p>
+        <p><strong>Жертви:</strong> понад 1 500 фермерів (самогубства та інші втрати).</p>
+        <h4>Наслідки</h4>
+        <p>Зниження врожаїв, продовольчі проблеми, внутрішня міграція.</p>
+      </div>
+    `;
+    indiaDrought.bindPopup(indiaDroughtPopup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Greenland glacier melt (selected years)
+    const greenlandCoords = [72.0, -40.0];
+    const greenland = L.marker(greenlandCoords).addTo(map);
+    const greenlandPopup = `
+      <div class="custom-popup">
+        <h3>Танення льодовиків Гренландії</h3>
+        <p>Місцевість: Гренландія</p>
+        <p>Дата: 2012, 2019, 2023 (і інші роки)</p>
+        <h4>Коротка інформація</h4>
+        <p>Масове танення льоду на великих ділянках поверхні, періодичні рекорди втрат льоду.</p>
+        <p><strong>Жертви:</strong> немає прямих.</p>
+        <h4>Наслідки</h4>
+        <p>Підвищення рівня моря, зміни течій, вплив на глобальну погоду.</p>
+      </div>
+    `;
+    greenland.bindPopup(greenlandPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Turkey fires (2021)
+    const turkeyCoords = [36.9, 30.7];
+    const turkeyFires = L.marker(turkeyCoords).addTo(map);
+    const turkeyPopup = `
+      <div class="custom-popup">
+        <h3>Пожежі в Туреччині (2021)</h3>
+        <p>Місцевість: Південне узбережжя Туреччини (Анталія, Мугла)</p>
+        <p>Дата: Липень–серпень 2021 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Масштабні лісові пожежі під час сильної спеки.</p>
+        <p><strong>Жертви:</strong> щонайменше 8 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Знищені ліси, евакуації, значні збитки туристичній галузі.</p>
+      </div>
+    `;
+    turkeyFires.bindPopup(turkeyPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Iberian fires (Spain & Portugal, 2022-2023)
+    const iberiaCoords = [40.0, -4.0];
+    const iberiaFires = L.marker(iberiaCoords).addTo(map);
+    const iberiaPopup = `
+      <div class="custom-popup">
+        <h3>Пожежі в Іспанії та Португалії (2022–2023)</h3>
+        <p>Місцевість: Іберійський півострів</p>
+        <p>Дата: Літо 2022–2023 років</p>
+        <h4>Коротка інформація</h4>
+        <p>Рекордні температури та сотні лісових пожеж.</p>
+        <p><strong>Жертви:</strong> понад 100 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Понад 250 000 га загиблих лісів, значні сільськогосподарські втрати, ≈€3 млрд збитків.</p>
+      </div>
+    `;
+    iberiaFires.bindPopup(iberiaPopup, { maxWidth: 340, className: 'custom-popup' });
+
+    // Indian Ocean tsunami 2004 (use a central marker over Sumatra)
+    const tsunami2004Coords = [3.0, 95.0]; // off the west coast of Sumatra
+    const tsunami2004 = L.marker(tsunami2004Coords).addTo(map);
+    const tsunami2004Popup = `
+      <div class="custom-popup">
+        <h3>Цунамі в Індійському океані (2004)</h3>
+        <p>Місцевість: Індонезія, Шрі-Ланка, Таїланд, Індія</p>
+        <p>Дата: 26 грудня 2004 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Землетрус магнітудою 9,1 біля Суматри спричинив хвилю цунамі до 30 метрів заввишки.</p>
+        <p><strong>Жертви:</strong> понад 230 000 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Повне знищення прибережних населених пунктів, сотні тисяч зниклих, мільйони бездомних, великі втрати у туризмі та рибальстві, створення системи раннього попередження про цунамі в Індійському океані.</p>
+      </div>
+    `;
+    tsunami2004.bindPopup(tsunami2004Popup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Hurricane Katrina 2005 (New Orleans area)
+    const katrinaCoords = [29.95, -90.07]; // near New Orleans
+    const katrina = L.marker(katrinaCoords).addTo(map);
+    const katrinaPopup = `
+      <div class="custom-popup">
+        <h3>Ураган «Катріна» (2005)</h3>
+        <p>Місцевість: США (Луїзіана, Міссісіпі, Новий Орлеан)</p>
+        <p>Дата: Серпень 2005 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Один із найпотужніших ураганів Атлантики. Зруйнував дамби Нового Орлеана, затопивши місто.</p>
+        <p><strong>Жертви:</strong> близько 1 800 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Економічні втрати понад $160 млрд, руйнування інфраструктури, біженці всередині США, підвищення уваги до проблеми кліматичних ризиків.</p>
+      </div>
+    `;
+    katrina.bindPopup(katrinaPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Amazon fires (central Amazon)
+    const amazonCoords = [-3.4653, -62.2159];
+    const amazon = L.marker(amazonCoords).addTo(map);
+    const amazonPopup = `
+      <div class="custom-popup">
+        <h3>Пожежі в Амазонії</h3>
+        <p>Місцевість: Амазонські джунглі (Бразилія, Перу, Болівія)</p>
+        <p>Дата: 2005, 2010, 2019, 2020 роки</p>
+        <h4>Коротка інформація</h4>
+        <p>Масові підпали та посухи спричинили сотні тисяч пожеж.</p>
+        <p><strong>Жертви:</strong> десятки людей, мільйони загиблих тварин.</p>
+        <h4>Наслідки</h4>
+        <p>Руйнування 10 млн га лісів, викид CO₂, зниження здатності Амазонії поглинати вуглець, вплив на клімат у всій Південній Америці.</p>
+      </div>
+    `;
+    amazon.bindPopup(amazonPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Pakistan floods 2010 (central Pakistan)
+    const pakistanCoords = [28.0, 69.0];
+    const pakistan = L.marker(pakistanCoords).addTo(map);
+    const pakistanPopup = `
+      <div class="custom-popup">
+        <h3>Повінь у Пакистані (2010)</h3>
+        <p>Місцевість: Центральний і південний Пакистан</p>
+        <p>Дата: Липень–вересень 2010 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Надзвичайно сильні мусонні дощі затопили 20 % території країни.</p>
+        <p><strong>Жертви:</strong> понад 1 700 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>20 млн постраждалих, знищено посіви, поширення інфекцій, руйнування мостів і доріг, серйозні наслідки для економіки.</p>
+      </div>
+    `;
+    pakistan.bindPopup(pakistanPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // East Africa drought 2011 (Horn of Africa)
+    const eafricaCoords = [4.5, 44.0];
+    const eafrica = L.marker(eafricaCoords).addTo(map);
+    const eafricaPopup = `
+      <div class="custom-popup">
+        <h3>Посуха в Східній Африці (2011)</h3>
+        <p>Місцевість: Сомалі, Ефіопія, Кенія</p>
+        <p>Дата: 2011 рік</p>
+        <h4>Коротка інформація</h4>
+        <p>Найгірша посуха за 60 років через відсутність дощів два сезони поспіль.</p>
+        <p><strong>Жертви:</strong> понад 250 000 осіб.</p>
+        <h4>Наслідки</h4>
+        <p>Голод, нестача питної води, загибель худоби, масові переселення, міжнародна гуманітарна криза.</p>
+      </div>
+    `;
+    eafrica.bindPopup(eafricaPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Hurricane Sandy 2012 (NY/NJ)
+    const sandyCoords = [40.7128, -74.0060];
+    const sandy = L.marker(sandyCoords).addTo(map);
+    const sandyPopup = `
+      <div class="custom-popup">
+        <h3>Ураган «Сенді» (2012)</h3>
+        <p>Місцевість: США (Нью-Йорк, Нью-Джерсі)</p>
+        <p>Дата: Жовтень 2012 року</p>
+        <h4>Коротка інформація</h4>
+        <p>Один із найдорожчих ураганів XXI століття, сильний вітер і затоплення узбережжя.</p>
+        <p><strong>Жертви:</strong> 233 особи.</p>
+        <h4>Наслідки</h4>
+        <p>Руйнування електромереж, підтоплення метро, збитки понад $70 млрд, зміни у міському плануванні Нью-Йорка для боротьби з майбутніми штормами.</p>
+      </div>
+    `;
+    sandy.bindPopup(sandyPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // Australian Black Summer fires 2019-2020 (southeast Australia)
+    const ausCoords = [-33.8688, 151.2093]; // Sydney area as anchor
+    const ausFires = L.marker(ausCoords).addTo(map);
+    const ausPopup = `
+      <div class="custom-popup">
+        <h3>Австралійські пожежі «Black Summer» (2019-2020)</h3>
+        <p>Місцевість: Австралія</p>
+        <p>Дата: липень 2019 – березень 2020</p>
+        <h4>Коротка інформація</h4>
+        <p>Наймасштабніші пожежі в історії країни, знищено величезні території лісів.</p>
+        <p><strong>Жертви:</strong> 34 людини, понад 3 млрд тварин загинули або постраждали.</p>
+        <h4>Наслідки</h4>
+        <p>Вигоріло понад 18 млн гектарів, десятки міст евакуйовано, сильне забруднення повітря, економічні втрати понад $100 млрд.</p>
+      </div>
+    `;
+    ausFires.bindPopup(ausPopup, { maxWidth: 320, className: 'custom-popup' });
+
+    // --- Timeline / day slider logic ---
+    // Helper date functions
+    function toDateYMD(d) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    function parseYMD(s) { // 'YYYY-MM-DD' -> Date at UTC midnight
+      const [y,m,d] = s.split('-').map(Number);
+      return new Date(Date.UTC(y,m-1,d));
+    }
+
+    const SLIDER_START = parseYMD('2000-01-01');
+    const SLIDER_END = parseYMD('2025-12-31');
+    const MS_PER_DAY = 24*3600*1000;
+    const totalDays = Math.round((SLIDER_END - SLIDER_START)/MS_PER_DAY);
+
+    // Helper: create emoji divIcon by type
+    function makeIcon(type) {
+      const map = {
+        fire: '🔥', flood: '🌊', hurricane: '🌀', earthquake: '🌋', drought: '☀️', heat: '🔥', glacier: '🧊', tsunami: '🌊', storm: '⛈️', other: '⚠️'
+      };
+      const emoji = map[type] || map.other;
+      return L.divIcon({ className: 'custom-div-icon', html: `<div class="marker-icon">${emoji}</div>`, iconSize: [34,34], iconAnchor: [17,34] });
+    }
+
+    // Build an events array mapping markers to start/end date strings (inclusive) and types
+    const events = [
+      { id: 'odessa', marker: odessaMarker, start: '2025-09-30', end: '2025-09-30', type: 'flood' },
+      { id: 'heat2003', marker: heat2003, start: '2003-07-01', end: '2003-08-31', type: 'heat' },
+  { id: 'ger2021', marker: ger2021, start: '2021-07-01', end: '2021-07-31', type: 'flood' },
+  { id: 'lytton', marker: lytton, start: '2021-06-01', end: '2021-06-30', type: 'heat' },
+  { id: 'pakistan22', marker: pakistan22, start: '2022-08-01', end: '2022-09-30', type: 'flood' },
+  { id: 'globalHeat', marker: globalHeat, start: '2023-01-01', end: '2023-12-31', type: 'heat' },
+  { id: 'arctic', marker: arcticAnom, start: '2024-01-01', end: '2024-12-31', type: 'glacier' },
+  { id: 'rio', marker: rioFloods, start: '2022-02-01', end: '2022-02-28', type: 'flood' },
+  { id: 'irma', marker: irma, start: '2017-09-01', end: '2017-09-30', type: 'hurricane' },
+  { id: 'maria', marker: maria, start: '2017-09-01', end: '2017-09-30', type: 'hurricane' },
+  { id: 'campFire', marker: campFire, start: '2018-11-01', end: '2018-11-30', type: 'fire' },
+  { id: 'siberia', marker: siberia, start: '2019-06-01', end: '2021-09-30', type: 'fire' },
+  { id: 'yangtze', marker: yangtze, start: '2020-07-01', end: '2020-08-31', type: 'flood' },
+  { id: 'haiti', marker: haiti, start: '2010-01-12', end: '2010-01-12', type: 'earthquake' },
+  { id: 'nepal', marker: nepal, start: '2015-04-25', end: '2015-04-25', type: 'earthquake' },
+  { id: 'turkSyr', marker: turkSyr, start: '2023-02-06', end: '2023-02-06', type: 'earthquake' },
+  { id: 'greece', marker: greeceFires, start: '2021-07-01', end: '2023-08-31', type: 'fire' },
+  { id: 'ian', marker: ian, start: '2022-09-01', end: '2022-09-30', type: 'hurricane' },
+  { id: 'daniel', marker: daniel, start: '2023-09-01', end: '2023-09-30', type: 'storm' },
+  { id: 'indiaDrought', marker: indiaDrought, start: '2016-01-01', end: '2022-12-31', type: 'drought' },
+  { id: 'greenland', marker: greenland, start: '2012-01-01', end: '2023-12-31', type: 'glacier' },
+  { id: 'turkeyFires', marker: turkeyFires, start: '2021-07-01', end: '2021-08-31', type: 'fire' },
+  { id: 'iberia', marker: iberiaFires, start: '2022-06-01', end: '2023-08-31', type: 'fire' },
+  { id: 'tsunami2004', marker: tsunami2004, start: '2004-12-26', end: '2004-12-26', type: 'tsunami' },
+  { id: 'katrina', marker: katrina, start: '2005-08-01', end: '2005-08-31', type: 'hurricane' },
+  { id: 'amazon', marker: amazon, start: '2005-01-01', end: '2020-12-31', type: 'fire' },
+  { id: 'pakistan2010', marker: pakistan, start: '2010-07-01', end: '2010-09-30', type: 'flood' },
+  { id: 'eafrica', marker: eafrica, start: '2011-01-01', end: '2011-12-31', type: 'drought' },
+  { id: 'sandy', marker: sandy, start: '2012-10-01', end: '2012-10-31', type: 'storm' },
+      { id: 'aus', marker: ausFires, start: '2019-07-01', end: '2020-03-31', type: 'fire' }
+    ];
+
+    // apply icons to markers according to type
+    events.forEach(ev => {
+      if (ev.type && ev.marker && ev.marker.setIcon) {
+        ev.marker.setIcon(makeIcon(ev.type));
+      }
+    });
+
+    // Helper: show/hide markers by selected date (YYYY-MM-DD)
+    function updateMarkersForDate(dateStr) {
+      const sel = parseYMD(dateStr);
+      events.forEach(ev => {
+        const start = parseYMD(ev.start);
+        const end = parseYMD(ev.end);
+        const visible = sel >= start && sel <= end;
+        if (visible) {
+          if (!map.hasLayer(ev.marker)) ev.marker.addTo(map);
+        } else {
+          if (map.hasLayer(ev.marker)) map.removeLayer(ev.marker);
+        }
+      });
+    }
+
+    // Helper: update MODIS layer to a given date string and sync dateLabel
+    function updateModisForDate(dateStr) {
+      document.getElementById('dateInput').value = dateStr;
+      document.getElementById('dateLabel').textContent = dateStr;
+      updateModis(dateStr);
+    }
+
+    // Helper: update MODIS layer to an arbitrary date string YYYY-MM-DD
+    function updateModis(dateStr) {
+      modisDate = dateStr;
+      if (modisLayer) map.removeLayer(modisLayer);
+      modisLayer = L.tileLayer(makeGIBSUrl(MODIS_LAYER_ID, modisDate), { tileSize:256, opacity:0.95, attribution:'NASA GIBS' });
+      modisLayer.addTo(map);
+    }
+
+    // Keep date input and slider synchronized when date input is changed manually
+    const dateInputEl = document.getElementById('dateInput');
+    dateInputEl.addEventListener('change', (e) => {
+      const d = e.target.value; // YYYY-MM-DD
+      if (!d) return;
+      // Set slider position to this date
+      const idx = dateStrToSlider(d);
+      dateSlider.value = Math.max(0, Math.min(totalDays, idx));
+      // Update MODIS and markers for the chosen date
+      updateModisForDate(d);
+      updateMarkersForDate(d);
+    });
+
+    // Wire the date slider
+    const dateSlider = document.getElementById('dateSlider');
+    const dateLabel = document.getElementById('dateLabel');
+    // configure slider range
+    dateSlider.min = 0;
+    dateSlider.max = totalDays;
+    // convert slider value (days since SLIDER_START) to YYYY-MM-DD
+    function sliderToDateStr(v) {
+      const d = new Date(SLIDER_START.getTime() + v*MS_PER_DAY);
+      return toDateYMD(d);
+    }
+    function dateStrToSlider(dateStr) {
+      const d = parseYMD(dateStr);
+      return Math.round((d - SLIDER_START)/MS_PER_DAY);
+    }
+
+    dateSlider.addEventListener('input', (e) => {
+      const v = parseInt(e.target.value,10);
+      const dateStr = sliderToDateStr(v);
+      dateLabel.textContent = dateStr;
+      // update date input and MODIS
+      updateModisForDate(dateStr);
+      // update markers
+      updateMarkersForDate(dateStr);
+    });
+
+    // Initialize slider to current dateInput
+    (function initSliderFromInput(){
+      const cur = document.getElementById('dateInput').value || toDateYMD(new Date());
+      const idx = dateStrToSlider(cur);
+      dateSlider.value = Math.max(0, Math.min(totalDays, idx));
+      const dateStr = sliderToDateStr(dateSlider.value);
+      dateLabel.textContent = dateStr;
+      updateModisForDate(dateStr);
+      updateMarkersForDate(dateStr);
+    })();
+
+    // Show-all checkbox behavior
+    const showAllCheckbox = document.getElementById('showAllCheckbox');
+    let showAll = false;
+    function showAllMarkers() {
+      events.forEach(ev => { if (!map.hasLayer(ev.marker)) ev.marker.addTo(map); });
+    }
+    function hideAllMarkers() {
+      events.forEach(ev => { if (map.hasLayer(ev.marker)) map.removeLayer(ev.marker); });
+    }
+    showAllCheckbox.addEventListener('change', (e) => {
+      showAll = !!e.target.checked;
+      if (showAll) {
+        // disable slider and date input to avoid confusion
+        dateSlider.disabled = true;
+        dateInputEl.disabled = true;
+        showAllMarkers();
+      } else {
+        dateSlider.disabled = false;
+        dateInputEl.disabled = false;
+        // restore state for current slider date
+        const curDate = sliderToDateStr(parseInt(dateSlider.value,10));
+        updateMarkersForDate(curDate);
+      }
+    });
+
+    // UI controls
+    document.getElementById('applyBtn').addEventListener('click', () => {
+      const d = document.getElementById('dateInput').value;
+      if (!d) return alert('Выберите дату в формате YYYY-MM-DD');
+      // Set slider and update MODIS + markers for the chosen date
+      const idx = dateStrToSlider(d);
+      dateSlider.value = Math.max(0, Math.min(totalDays, idx));
+      updateModisForDate(d);
+      updateMarkersForDate(d);
+    });
+
+    document.getElementById('toggleModis').addEventListener('click', (e) => {
+      if (map.hasLayer(modisLayer)) { map.removeLayer(modisLayer); e.target.textContent = 'Показать MODIS'; }
+      else { modisLayer.addTo(map); e.target.textContent = 'Скрыть MODIS'; }
+    });
+
+    // --- GeoTIFF/COG overlay (MOPITT example) ---
+    // NOTE: COG must be publicly accessible and support CORS. If Earthdata-protected, use server-side preprocessing.
+    
+
+    // guard removeCog button (it may not exist)
+    const removeCogBtn = document.getElementById('removeCog');
+    if (removeCogBtn) {
+      removeCogBtn.addEventListener('click', () => {
+        if (typeof cogLayer !== 'undefined' && cogLayer) { map.removeLayer(cogLayer); cogLayer = null; }
+      });
+    }
+
+    // --- Полезные подсказки для вас (в коде/в UI) ---
+    // 1) Если MOPITT/ASTER файлы защищены Earthdata Login, лучше на сервере:
+    //    - скачать нужную дату/продукт (через ASDC/GIOVANNI/Earthdata API),
+    //    - конвертировать в COG (gdal_translate -of COG ...) и разместить на S3 или веб-сервере с CORS,
+    //    - затем использовать URL, как показано выше.
+    // 2) Ссылка на GIBS docs: https://nasa-gibs.github.io/gibs-api-docs/access-basics/ (используется для MODIS WMTS/WMS). 
+    // 3) Источники MOPITT: ASDC / Giovanni / MOPITT pages (где скачать продукты и спецификации).
+  </script>
+
+  <script>
+    // Bind simple hover tooltips from each marker's popup <h3> (if present)
+    function bindTooltipsToMarkers() {
+      events.forEach(ev => {
+        try {
+          // Remove existing tooltip to avoid duplicates
+          if (ev.marker && ev.marker.unbindTooltip) ev.marker.unbindTooltip();
+          let title = '';
+          if (ev.marker && ev.marker.getPopup && ev.marker.getPopup()) {
+            const content = ev.marker.getPopup().getContent();
+            if (content) {
+              const tmp = document.createElement('div');
+              tmp.innerHTML = content;
+              const h = tmp.querySelector('h3');
+              if (h) title = h.textContent.trim();
+              else title = tmp.textContent.trim().split('\n')[0].slice(0,120);
+            }
+          }
+          if (!title) title = ev.id || 'Подія';
+          if (ev.marker && ev.marker.bindTooltip) {
+            ev.marker.bindTooltip(title, { direction: 'top', offset: [0, -12], opacity: 0.9 });
+          }
+        } catch (err) {
+          // ignore tooltip binding errors for any marker
+          console.warn('Tooltip bind failed for', ev && ev.id, err);
+        }
+      });
+    }
+
+    // Update the visible count display based on which markers are currently on the map
+    function updateVisibleCount() {
+      const countEl = document.getElementById('visibleCount');
+      if (!countEl) return;
+      let cnt = 0;
+      events.forEach(ev => { if (ev.marker && map.hasLayer(ev.marker)) cnt++; });
+      countEl.textContent = String(cnt);
+      return cnt;
+    }
+
+    // Wire the Zoom-to-all button to fit bounds to visible markers
+    const zoomAllBtn = document.getElementById('zoomAllBtn');
+    if (zoomAllBtn) {
+      zoomAllBtn.addEventListener('click', () => {
+        const visibleMarkers = events.filter(ev => ev.marker && map.hasLayer(ev.marker)).map(ev => ev.marker);
+        console.debug('zoomAllBtn clicked, visibleMarkers count:', visibleMarkers.length);
+        if (!visibleMarkers.length) {
+          // If none are visible, inform user and try to zoom to map extent
+          alert('Немає видимих флагів для масштабування. Спробуйте вимкнути "Показати всі флаги" або змінити дату.');
+          return;
+        }
+        try {
+          if (visibleMarkers.length === 1) {
+            // single marker: set view to marker with an appropriate zoom
+            const latlng = visibleMarkers[0].getLatLng ? visibleMarkers[0].getLatLng() : null;
+            if (latlng) {
+              map.setView(latlng, Math.min(map.getMaxZoom(), 8));
+              return;
+            }
+          }
+          const group = L.featureGroup(visibleMarkers);
+          const bounds = group.getBounds();
+          if (!bounds || !bounds.isValid || !bounds.isValid()) {
+            // older Leaflet versions may not have isValid; fallback check
+            if (!bounds || bounds.getSouthWest == null) {
+              console.warn('Computed bounds are invalid, aborting fitBounds:', bounds);
+              alert('Неможливо здійснити масштабування: невірні межі.');
+              return;
+            }
+          }
+          map.fitBounds(bounds.pad ? bounds.pad(0.2) : bounds, { padding: [30,30] });
+        } catch (err) {
+          console.error('Zoom to all failed', err);
+          alert('Сталася помилка при масштабуванні. Подивіться консоль для деталей.');
+        }
+      });
+    }
+
+    // Ensure tooltips are bound and count is correct after initial setup
+    bindTooltipsToMarkers();
+    updateVisibleCount();
+
+    // Also call updateVisibleCount whenever markers are shown/hidden by date or showAll
+    // Patch updateMarkersForDate and showAll handlers by wrapping them with calls.
+    // (We can't reliably rewrite earlier functions here, so we just observe map 'layeradd'/'layerremove')
+    map.on('layeradd layerremove', () => {
+      // small debounce-ish behaviour
+      setTimeout(updateVisibleCount, 50);
+    });
+  </script>
+
+    
+</body>
+
+</html>
