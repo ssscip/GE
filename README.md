@@ -1,7 +1,7 @@
 
 # GE: Global Environmental Monitoring
 
-This project is an interactive platform for visualizing NASA satellite data (MODIS, ASTER, MOPITT, etc.) from 2000–2025.
+This project is an interactive platform for visualizing NASA satellite data MODIS from 2000–2025.
 
 ## Features
 
